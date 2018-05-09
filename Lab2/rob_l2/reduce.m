@@ -12,7 +12,7 @@ function rds = reduce(ds, parts)
 		error("Niewlasciwe wspolczynniki redukcji.");
 	end
 	
-  newData = []
+  newData = [];
   for i=1:rows(labels)
     data = ds(ds(:, 1) == i, :);
     needProbsCount = rows(data) * parts(i);
@@ -23,3 +23,4 @@ function rds = reduce(ds, parts)
 	% zdecydowanie wypadaloby uzyc randperm do mieszania probek w klasach
 	% ta implementacja jest daleka od doskonalosci
 	rds = newData;
+  

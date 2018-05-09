@@ -146,10 +146,13 @@ train(midx-1:midx+1, :)
 
 % je�li nabra�em przekonania, �e pr�bka midx jest do usuni�cia, to:
 size(train)
+midx = 642
+train(midx, :) = [];
+midx = 186
 train(midx, :) = [];
 size(train)
 
-% 642 i 186
+% 642 i 186(w tej kolejności)
 
 % procedur� szukania i usuwania warto�ci odstaj�cych trzeba powtarza� do skutku
 
@@ -157,9 +160,16 @@ size(train)
 % w tym przypadku w zupe�no�ci wystarczy poogl�da� wykresy dw�ch cech i wybra� te, kt�re
 % daj� w miar� dobrze odseparowane od siebie klasy
 
+plot2features(train, 2, 4)
+
 % Po ustaleniu cech (dok�adniej: indeks�w kolumn, w kt�rych cechy siedz�):
 train = train(:, [1 4 6]);  % wybieram 2 i 4, czyli train = train(:, [1 2 4]);
 test = test(:, [1 4 6]);
+
+%do wykonania
+train = train(:, [1 2 4]);
+test = test(:, [1 2 4]);
+%
 
 % to nie jest najros�dniejszy wyb�r; 4 i 6 na pewno trzeba zmieni�
 
@@ -177,7 +187,7 @@ base_ercf = zeros(1,3);
 base_ercf(1) = mean(bayescls(test(:,2:end), @pdf_indep, pdfindep_para) != test(:,1));
 base_ercf(2) = mean(bayescls(test(:,2:end), @pdf_multi, pdfmulti_para) != test(:,1));
 base_ercf(3) = mean(bayescls(test(:,2:end), @pdf_parzen, pdfparzen_para) != test(:,1));
-base_ercf
+result3 = base_ercf
 
 % wyniki - 0.0263158   0.0049342   0.0241228
 
@@ -186,14 +196,42 @@ base_ercf
 % Poniewa� reduce ma losowa� pr�bki, to eksperyment nale�y powt�rzy� 5 (lub wi�cej) razy
 % W sprawozdaniu prosz� poda� tylko warto�� �redni� i odchylenie standardowe wsp��czynnika b��du
 
-parts = [0.1 0.25 0.5];
+parts = [0.1 0.25 0.5 1];
 rep_cnt = 5; % przynajmniej
 
 % YOUR CODE GOES HERE 
-for i:rep_cnt
+base_ercf = zeros(rep_cnt,3, columns(parts));
+base_ercf_4cl = zeros(rep_cnt,3, columns(parts));
+for i=1:rep_cnt
+  for k=1:columns(parts)
+    newParts = repmat([parts(k)], [1;rows(unique(train(:,1)))]);
+    reducedToTrain = reduce(train, newParts);
+    %params
+    pdfindep_para = para_indep(reducedToTrain);
+    pdfmulti_para = para_multi(reducedToTrain);
+    pdfparzen_para = para_parzen(reducedToTrain, 1/1000);
+    %test
+    bayes_indep = bayescls(test(:,2:end), @pdf_indep, pdfindep_para);
+    a1 = bayes_indep != test(:,1);
+    base_ercf(i, 1, k) = mean(a1);
+    base_ercf_4cl(i, 1, k) = mean(mod(bayes_indep,4) != mod(test(:,1),4));
+   
+    bayes_multi = bayescls(test(:,2:end), @pdf_multi, pdfmulti_para);
+    a2 = bayes_multi != test(:,1);
+    base_ercf(i, 2, k) = mean(a2);
+    base_ercf_4cl(i, 2, k) = mean(mod(bayes_multi,4) != mod(test(:,1),4));
   
-  
+    bayes_parzen = bayescls(test(:,2:end), @pdf_parzen, pdfparzen_para);
+    a3 = bayes_parzen != test(:,1);  
+    base_ercf(i, 3, k) = mean(a3);
+    base_ercf_4cl(i, 3, k) = mean(mod(bayes_parzen,4) != mod(test(:,1),4));
+  end
 end
+base_ercf;
+mean(base_ercf)
+mean(base_ercf_4cl)
+result4_1 = mean(base_ercf)
+result4_2 = mean(base_ercf_4cl)
 %
 
 
@@ -201,13 +239,14 @@ end
 
 parzen_widths = [0.0001, 0.0005, 0.001, 0.005, 0.01];
 parzen_res = zeros(1, columns(parzen_widths));
+parzen_res_4cl = zeros(1, columns(parzen_widths));
 
 % YOUR CODE GOES HERE 
 %
 for i=1:columns(parzen_widths)
   pdfparzen_para_tmp = para_parzen(train, parzen_widths(i));
-  %parzen_res(i) = pdf_parzen(train(:,2:end), pdfparzen_para_tmp);
   parzen_res(i) = mean(bayescls(test(:,2:end), @pdf_parzen, pdfparzen_para_tmp) != test(:,1));
+  parzen_res_4cl(i) = mean(mod(bayescls(test(:,2:end), @pdf_parzen, pdfparzen_para_tmp),4) != mod(test(:,1),4));
 end
 
 %   1.0000e-04   5.0000e-04   1.0000e-03   5.0000e-03   1.0000e-02
@@ -216,9 +255,12 @@ end
 %
 %
 
-[parzen_widths; parzen_res]
+%[parzen_widths; parzen_res]
+result5_1 = [parzen_widths; parzen_res]
+result5_2 = [parzen_widths; parzen_res_4cl]
 % Tu a� prosi si� do�o�y� do danych numerycznych wykres
 semilogx(parzen_widths, parzen_res)
+semilogx(parzen_widths, parzen_res_4cl)
 
 % W punkcie 6 redukcja dotyczy ZBIORU TESTOWEGO (nie ma potrzeby zmiany zbioru ucz�cego)
 % 
@@ -226,6 +268,35 @@ apriori = [0.085 0.165 0.165 0.085 0.085 0.165 0.165 0.085];
 parts = [0.5 1.0 1.0 0.5 0.5 1.0 1.0 0.5];
 
 % YOUR CODE GOES HERE 
+rep_cnt = 5;
+base_ercf = zeros(rep_cnt,3);
+base_ercf_4cl = zeros(rep_cnt,3);
+for i=1:rep_cnt
+  reduced = reduce(test, parts);
+  %params
+  pdfindep_para = para_indep(train);
+  pdfmulti_para = para_multi(train);
+  pdfparzen_para = para_parzen(train, 0.001);
+  %test
+  bayes_indep = bayescls(reduced(:,2:end), @pdf_indep, pdfindep_para, apriori);
+  a1 = bayes_indep != reduced(:,1);
+  base_ercf(i, 1) = mean(a1);
+  base_ercf_4cl(i, 1) = mean(mod(bayes_indep,4) != mod(reduced(:,1),4));
+  
+  bayes_multi = bayescls(reduced(:,2:end), @pdf_multi, pdfmulti_para, apriori);
+  a2 = bayes_multi != reduced(:,1);
+  base_ercf(i, 2) = mean(a2);
+  base_ercf_4cl(i, 2) = mean(mod(bayes_multi,4) != mod(reduced(:,1),4));
+  
+  bayes_parzen = bayescls(reduced(:,2:end), @pdf_parzen, pdfparzen_para, apriori);
+  a3 = bayes_parzen != reduced(:,1);
+  base_ercf(i, 3) = mean(a3);
+  base_ercf_4cl(i, 3) = mean(mod(bayes_parzen,4) != mod(reduced(:,1),4));
+end
+mean(base_ercf)
+result6_1 = mean(base_ercf);
+result6_2 = mean(base_ercf_4cl);
+
 %
 
 
@@ -238,5 +309,26 @@ std(train(:,2:end))
 % Procedura normalizacji jest aplikowana do zbioru ucz�cego i testowego
 
 % YOUR CODE GOES HERE 
-%
+minTrain = min(train(:,2:end));
+maxTrain = max(train(:,2:end));
+trainNorm = [train(:,1) (train(:,2:end).-minTrain)./(maxTrain.-minTrain)];
+testNorm = [test(:,1) (test(:,2:end).-minTrain)./(maxTrain.-minTrain)];
+resCl = zeros(rows(testNorm), 1);
+for i=1:rows(testNorm)
+  resCl(i) = cls1nn(trainNorm, testNorm(i, 2:end));
+end
+
+err = mean(resCl != testNorm(:,1))
+
+pdfindep_para = para_indep(trainNorm);
+pdfmulti_para = para_multi(trainNorm);
+pdfparzen_para = para_parzen(trainNorm, 1/1000); 
+
+base_ercf = zeros(1,3);
+base_ercf(1) = mean(bayescls(testNorm(:,2:end), @pdf_indep, pdfindep_para) != testNorm(:,1));
+base_ercf(2) = mean(bayescls(testNorm(:,2:end), @pdf_multi, pdfmulti_para) != testNorm(:,1));
+base_ercf(3) = mean(bayescls(testNorm(:,2:end), @pdf_parzen, pdfparzen_para) != testNorm(:,1));
+base_ercf;
+
+result7_1 = base_ercf
 
